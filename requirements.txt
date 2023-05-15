@@ -1,0 +1,5 @@
+apischema==0.18.0
+click==8.1.3
+pyyaml==6.0
+whatrecord==0.4.2
+typing_extensions

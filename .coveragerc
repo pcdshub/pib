@@ -1,0 +1,11 @@
+[run]
+source =
+    pib
+[report]
+omit =
+    #versioning
+    .*version.*
+    *_version.py
+    #tests
+    *test*
+    pib/tests/*

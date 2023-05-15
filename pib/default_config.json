@@ -1,0 +1,14 @@
+{
+    "module_path_regexes": [
+        "/cds/group/pcds/epics/(?P<base>[^/]+)/modules/(?P<name>[^/]+)/(?P<tag>[^/]+)/?",
+        "/cds/group/pcds/package/epics/(?P<base>[^/]+)/modules/(?P<name>[^/]+)/(?P<tag>[^/]+)/?",
+        "/cds/group/pcds/epics/modules/(?P<name>[^/]+)/(?P<tag>[^/]+)/?",
+        "/cds/group/pcds/epics-dev/modules/(?P<name>[^/]+)/(?P<tag>[^/]+)/?",
+        "/cds/group/pcds/package/epics/(?P<base>[^/]+)/module/(?P<name>[^/]+)/(?P<tag>[^/]+)/?",
+        "/afs/slac/g/lcls/epics/(?P<base>[^/]+)/modules/(?P<name>[^/]+)/(?P<tag>[^/]+)/?",
+        "/afs/slac.stanford.edu/g/lcls/vol8/epics/(?P<base>[^/]+)/modules/(?P<name>[^/]+)/(?P<tag>[^/]+)/?"
+    ],
+    "base_path_regexes": [
+        "/cds/group/pcds/epics/base/(?P<tag>[^/]+)/?"
+    ]
+}

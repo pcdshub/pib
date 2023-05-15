@@ -1,0 +1,40 @@
+{% set package_name = "pib" %}
+{% set import_name = "pib" %}
+{% set version = load_file_regex(load_file=os.path.join(import_name, "_version.py"), regex_pattern=".*version = '(\S+)'").group(1) %}
+
+package:
+  name: {{ package_name }}
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv
+
+requirements:
+  build:
+    - python >=3.9
+    - pip
+    - setuptools_scm
+  run:
+    - python >=3.9
+    - apischema
+    - click
+    - pyyaml
+    - whatrecord
+    - typing_extensions
+
+test:
+  imports:
+    - {{ import_name }}
+  requires:
+    - pytest
+
+about:
+  home: https://github.com/pcdshub/pib
+  license: LicenseRef-BSD-3-Clause-SLAC
+  license_family: BSD
+  summary: IOC building tools

@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# post-checkout hook to fix internal /afs links by making them relative:
+#     path = /afs/slac/g/cd/swe/git/repos/package/epics/modules/pva2pva.git
+# becomes
+#     path = ../pva2pva.git
+
+PREV_HEAD="$1"
+NEW_HEAD="$2"
+NEW_BRANCH="$3"
+
+if [ "$NEW_BRANCH" = "1" ]; then
+  echo "New branch!"
+   if grep -F /afs/slac .gitmodules &> /dev/null; then
+      # skipping in-place (-i) for macos compatibility for now:
+      cp .gitmodules .gitmodules_orig
+      sed -e "s#/afs/slac.*repos/package/epics/modules/#../#" .gitmodules_orig > .gitmodules
+      rm -f .gitmodules_orig
+      # git submodule update --recursive
+   fi
+fi
+
+exit 0
