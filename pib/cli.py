@@ -470,7 +470,7 @@ def cli_inspect(
         if variable in specs.variable_name_to_module:
             app.standard_modules.append(variable)
         else:
-            extra_modules.append(version.to_module(variable))
+            extra_modules.append(version.to_module(variable, settings=specs.settings))
 
     file = SpecificationFile(
         application=app,
