@@ -69,7 +69,14 @@ Maybe on the list of things to explore:
   mapping of library name to system package name.
 * Site configuration-defined dependencies (maybe simple ``git clone`` ones as
   well?)
-
+* Support spec file repositories from GitHub such that you could do ``pib -s
+  pcdshub/ecs-pib-spec:R7.0.2-23.05-1/base.yaml``.  (aside: This syntax seems
+  the most familiar when coming from docker, though it conflicts a bit with the
+  environment variable setting of spec files.)
+* CI-focused helpers: make it easier for ``pib`` to be used easily in CI jobs
+  exclusive of docker.  Along with an appropriate spec file for epics-base (at
+  minimum), the goal would be to make the simple ``pib please --app .`` be a
+  single-command IOC builder.
 
 Requirements
 ------------
@@ -86,10 +93,12 @@ Installation
 
 ::
 
-  $ pip install .
+  $ pip install pib
+
+`PyPI <https://pypi.org/project/pib/>`_
 
 Running the Tests
 -----------------
 ::
 
-  $ pytest -v
+  $ python -m pytest -v

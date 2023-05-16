@@ -566,15 +566,14 @@ def cli_requirements(
 
     for source in sources or [syspkg.guess_package_manager(), "conda"]:
         logger.info("Installing %s dependencies", source)
-        command = syspkg.get_install_command(
+        for command in syspkg.get_install_commands(
             requires,
             source,
             sudo=sudo,
             conda_path=conda_path,
-        )
-        if command:
+        ):
             str_command = shlex.join(command)
-            logger.info("Running: %s", str_command)
+            logger.info("%s install running: %s", source, str_command)
             if subprocess.check_call(command) != 0:  # noqa: S603
                 raise exceptions.RequirementInstallationFailedError(
                     f"Command was: {str_command}",
