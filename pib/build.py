@@ -335,7 +335,12 @@ def create_release_site(
     ----------
     specs : Specifications
     extra_variables: dict[str, str], optional
+        Extra variables to set in the RELEASE_SITE file.
     path: pathlib.Path, optional
+        The path to write the RELEASE_SITE file to.  Defaults to
+        settings-specified "{settings.support}/RELEASE_SITE".  For example,
+        this setting for EPICS BASE R7.0.3.1-2.0 would be:
+        ``/cds/group/pcds/epics/R7.0.3.1-2.0/modules``.
 
     Returns
     -------
@@ -350,6 +355,8 @@ def create_release_site(
     }
     if extra_variables:
         variables.update(extra_variables)
+
+    release_site.parent.mkdir(parents=True, exist_ok=True)
 
     with open(release_site, mode="w") as fp:
         for variable, value in variables.items():
