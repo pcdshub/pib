@@ -143,9 +143,14 @@ class Specifications:
         -------
         SpecificationFile
         """
+        logger.debug("Loading spec file: %s", spec_filename)
         spec_filename = pathlib.Path(spec_filename).expanduser().resolve()
         spec = SpecificationFile.from_filename(spec_filename)
-        self.add_spec(spec, filename=spec_filename)
+        try:
+            self.add_spec(spec, filename=spec_filename)
+        except Exception:
+            logger.exception("Failed to add spec file: %s", spec_filename)
+            raise
         return spec
 
     def add_spec(
@@ -487,6 +492,8 @@ def sync_module(specs: Specifications, module: Module) -> None:
     module : Module
         The module to synchronize.
     """
+    logger.debug("Synchronizing module: %s", module.name)
+
     group = get_dependency_group_for_module(module, specs.settings, recurse=True)
     dep = group.all_modules[group.root]
     logger.info("Updating makefiles in %s", group.root)
