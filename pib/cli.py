@@ -16,7 +16,7 @@ import apischema
 import click
 import yaml
 
-from . import build, config, exceptions, syspkg
+from . import build, config, exceptions, makefile, syspkg
 from .config import DEFAULT_SITE_CONFIG
 from .spec import Application, Module, SpecificationFile
 
@@ -505,6 +505,67 @@ def cli_parse(ctx: click.Context) -> None:
     specs = info["specs"]
     serialized = apischema.serialize(build.Specifications, specs)
     print(json.dumps(serialized, indent=2))  # noqa: T201
+
+
+@cli.command(
+    "inspect-syspkg",
+    help="Inspect non-EPICS system package manager requirements",
+)
+@click.argument(
+    "path",
+    type=click.Path(
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+        readable=True,
+        resolve_path=True,
+        allow_dash=False,
+        path_type=pathlib.Path,
+    ),
+    required=False,
+)
+@click.option(
+    "--os-class",
+    "os_class",
+    required=False,
+    type=str,
+    multiple=False,
+    default=None,
+)
+@click.pass_context
+def cli_inspect_syspkg(
+    ctx: click.Context,
+    path: Optional[pathlib.Path] = None,
+    os_class: Optional[str] = None,
+) -> None:
+    logger.info("Inspect-syspkg: path=%s", path)
+    info = cast(CliContext, ctx.obj)
+    specs = info["specs"]
+    if specs.base_spec is None:
+        raise RuntimeError(
+            "epics-base is required for introspection and was not found in the "
+            "specification files",
+        )
+
+    if path is None:
+        path = pathlib.Path.cwd()
+
+    epics_base = specs.settings.get_path_for_module(specs.base_spec)
+    path_makefile = makefile.get_makefile_for_path(path, epics_base=epics_base)
+    libs = makefile.find_libraries_from_makefile(path_makefile)
+    if os_class is None:
+        serialized = apischema.serialize(
+            makefile.BuildSystemLibraries,
+            libs,
+            exclude_defaults=True,
+            exclude_none=True,
+        )
+
+        click.echo(yaml.dump(serialized, indent=2, sort_keys=False))
+        # TODO: --json/--yaml
+        # click.echo(json.dumps(serialized, indent=2))
+    else:
+        click.echo(" ".join(libs.get_libraries_for_os_class(os_class)))
 
 
 @cli.command(

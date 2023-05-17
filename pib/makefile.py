@@ -546,13 +546,13 @@ def find_libraries_from_makefile(makefile: Makefile) -> BuildSystemLibraries:
             else:
                 if "_SYS_LIBS_" in key or key.endswith("_SYS_LIBS"):
                     name, class_ = key.split("_SYS_LIBS", 1)
-                    if name not in libs.by_name:
+                    if name not in libs.sys_by_name:
                         libs.sys_by_name[name] = Libraries()
-                    libs.sys_by_name[name].add_by_class(class_, value)
+                    libs.sys_by_name[name].add_by_class(class_.lstrip("_"), value)
                 elif "_LIBS_" in key or key.endswith("_LIBS"):
                     name, class_ = key.split("_LIBS", 1)
                     if name not in libs.by_name:
                         libs.by_name[name] = Libraries()
-                    libs.by_name[name].add_by_class(class_, value)
+                    libs.by_name[name].add_by_class(class_.lstrip("_"), value)
 
     return libs

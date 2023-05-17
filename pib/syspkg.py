@@ -1,5 +1,7 @@
 """OS/package manager requirements / dependencies."""
 
+from __future__ import annotations
+
 import enum
 import shutil
 from typing import Optional
