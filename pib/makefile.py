@@ -17,6 +17,7 @@ from . import util
 
 if typing.TYPE_CHECKING:
     import datetime
+    from collections.abc import Generator
 
 
 logger = logging.getLogger(__name__)
@@ -389,3 +390,169 @@ def update_related_makefiles(
             patched.append(makefile_path)
 
     return patched
+
+
+@dataclass
+class Libraries:
+    """Libraries defined in the EPICS build system."""
+
+    #: For all platforms.
+    for_all: list[str] = field(default_factory=list)
+    #: For the specific platform (designated by OS class).
+    by_os_class: dict[str, list[str]] = field(default_factory=dict)
+    #: For platforms without a corresponding OS class.
+    default: list[str] = field(default_factory=list)
+
+    def add_by_class(self, class_: str, value: str) -> None:
+        if not class_:
+            target_list = self.for_all
+        elif class_ == "DEFAULT":
+            target_list = self.default
+        else:
+            target_list = self.by_os_class.setdefault(class_, [])
+
+        for lib in value.split():
+            if lib not in target_list:
+                target_list.append(lib)
+
+    def get_libraries_for_os_class(self, os_class: str) -> list[str]:
+        result = [*self.for_all]
+        for lib in self.by_os_class.get(os_class, self.default):
+            if lib not in result:
+                result.append(lib)
+        return result
+
+
+@dataclass
+class BuildSystemLibraries:
+    """
+    User or system libraries marked for usage in the EPICS build system.
+
+    Per the EPICS documentation, libraries are linked in the following order.
+
+    1. by_name
+    <libname>_LIBS
+    <libname>_LIBS_<osclass> or <libname>_LIBS_DEFAULT
+
+    2a. lib - for linking libraries
+    LIB_LIBS
+    LIB_LIBS_<osclass> or LIB_LIBS_DEFAULT
+
+    2b. prod - for linking the final product
+    PROD_LIBS
+    PROD_LIBS_<osclass> or PROD_LIBS_DEFAULT
+
+    3. user
+    USR_LIBS
+    USR_LIBS_<osclass> or USR_LIBS_DEFAULT
+
+    4. sys_by_name
+    <libname>_SYS_LIBS
+    <libname>_SYS_LIBS_<osclass> or <libname>_SYS_LIBS_DEFAULT
+
+    5a. sys_lib - for linking system libraries with libraries
+    LIB_SYS_LIBS
+    LIB_SYS_LIBS_<osclass> or LIB_SYS_LIBS_DEFAULT
+
+    5b. sys_prod - for linking system libraries with the final product
+    PROD_SYS_LIBS
+    PROD_SYS_LIBS_<osclass> or PROD_SYS_LIBS_DEFAULT
+
+    6. sys_user
+    USR_SYS_LIBS
+    USR_SYS_LIBS_<osclass> or USR_SYS_LIBS_DEFAULT
+    """
+
+    by_name: dict[str, Libraries] = field(default_factory=dict)
+    lib: Libraries = field(default_factory=Libraries)
+    prod: Libraries = field(default_factory=Libraries)
+    user: Libraries = field(default_factory=Libraries)
+
+    sys_by_name: dict[str, Libraries] = field(default_factory=dict)
+    sys_lib: Libraries = field(default_factory=Libraries)
+    sys_prod: Libraries = field(default_factory=Libraries)
+    sys_user: Libraries = field(default_factory=Libraries)
+
+    def get_libraries_for_os_class(
+        self,
+        os_class: str,
+        include_non_system: bool = False,
+        name: Optional[str] = None,
+    ) -> list[str]:
+        libs = []
+        if include_non_system:
+            if name:
+                if name in self.by_name:
+                    libs.append(self.by_name[name])
+            else:
+                libs.extend(list(self.by_name.values()))
+            libs.extend([self.lib, self.prod, self.user])
+
+        if name:
+            if name in self.by_name:
+                libs.append(self.sys_by_name[name])
+        else:
+            libs.extend(list(self.sys_by_name.values()))
+        libs.extend([self.sys_lib, self.sys_prod, self.sys_user])
+
+        result = []
+        for lib in libs:
+            for name in lib.get_libraries_for_os_class(os_class):
+                if name not in result:
+                    result.append(name)
+        return result
+
+
+
+def recurse_makefiles(makefile: Makefile) -> Generator[Makefile, None, None]:
+    seen = set()
+    for directory in makefile.env.get("DIRS", "").split():
+        if directory.startswith(".."):
+            # Don' let it go out of the repo directory
+            continue
+
+        fn = makefile.working_directory / directory / "Makefile"
+        if fn in seen:
+            # We shouldn't see the same directory twice, but just in case
+            continue
+
+        seen.add(fn)
+        if fn.exists():
+            sub_makefile = Makefile.from_file(fn)
+            yield sub_makefile
+            yield from recurse_makefiles(sub_makefile)
+
+
+def find_libraries_from_makefile(makefile: Makefile) -> BuildSystemLibraries:
+    libs = BuildSystemLibraries()
+
+    prefix_to_library = {
+        "USR_LIBS": libs.user,
+        "LIB_LIBS": libs.lib,
+        "PROD_LIBS": libs.prod,
+
+        "USR_SYS_LIBS": libs.sys_user,
+        "PROD_SYS_LIBS": libs.sys_prod,
+        "LIB_SYS_LIBS": libs.sys_lib,
+        "SYS_PROD_LIBS": libs.sys_prod,  # deprecated, but that means nothing to us
+    }
+    for inner_makefile in recurse_makefiles(makefile):
+        for key, value in inner_makefile.env.items():
+            for prefix, lib in prefix_to_library.items():
+                if key.startswith(prefix):
+                    class_ = key.split(prefix)[1].lstrip("_")
+                    lib.add_by_class(class_, value)
+                    break
+            else:
+                if "_SYS_LIBS_" in key or key.endswith("_SYS_LIBS"):
+                    name, class_ = key.split("_SYS_LIBS", 1)
+                    if name not in libs.by_name:
+                        libs.sys_by_name[name] = Libraries()
+                    libs.sys_by_name[name].add_by_class(class_, value)
+                elif "_LIBS_" in key or key.endswith("_LIBS"):
+                    name, class_ = key.split("_LIBS", 1)
+                    if name not in libs.by_name:
+                        libs.by_name[name] = Libraries()
+                    libs.by_name[name].add_by_class(class_, value)
+
+    return libs
