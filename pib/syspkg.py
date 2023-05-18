@@ -1,5 +1,7 @@
 """OS/package manager requirements / dependencies."""
 
+from __future__ import annotations
+
 import enum
 import shutil
 from typing import Optional
@@ -21,6 +23,33 @@ def find_conda_path() -> str:
     raise exceptions.ProgramMissingError("Unable to find mamba/conda in the path")
 
 
+def split_yum_groups(packages: list[str]) -> tuple[list[str], list[str]]:
+    """Split yum requirements into 'groupinstall' and single packages."""
+    single, groups = [], []
+    for pkg in packages:
+        if pkg.startswith("group:"):
+            group = pkg.split(":", 1)[1]
+            groups.append(group.strip("'").strip('"'))
+        else:
+            single.append(pkg)
+    return single, groups
+
+
+def get_yum_install_commands(packages: list[str], sudo: bool = True) -> list[list[str]]:
+    """Get yum requirements installation commands."""
+    singles, groups = split_yum_groups(packages)
+    if not singles and not groups:
+        return []
+
+    commands = []
+    prefix = ["sudo"] if sudo else []
+    if groups:
+        commands.append([*prefix, "yum", "-y", "groupinstall", *groups])
+    if singles:
+        commands.append([*prefix, "yum", "-y", "install", *singles])
+    return commands
+
+
 class PackageManager(enum.Enum):
     """Supported [system] package managers."""
 
@@ -33,28 +62,29 @@ class PackageManager(enum.Enum):
     def requires_sudo(self) -> bool:
         return self in (PackageManager.apt, PackageManager.yum)
 
-    def get_command(
+    def get_commands(
         self,
+        packages: list[str],
+        *,
         sudo: bool = False,
         conda_path: Optional[str] = None,
-    ) -> list[str]:
+    ) -> list[list[str]]:
+        if self == PackageManager.yum:
+            return get_yum_install_commands(packages, sudo=sudo)
+
+        prefix = ["sudo"] if sudo else []
         if self == PackageManager.conda:
             if conda_path is None:
                 conda_path = find_conda_path()
-            command = [conda_path, "install", "-y"]
-        elif self == PackageManager.yum:
-            command = ["yum", "-y", "install"]
-            # TODO: groupinstall support?
+            command = [*prefix, conda_path, "install", "-y"]
         elif self == PackageManager.apt:
-            command = ["apt-get", "install", "-y"]
+            command = [*prefix, "apt-get", "install", "-y"]
         elif self == PackageManager.brew:
-            command = ["brew", "install"]
+            command = [*prefix, "brew", "install"]
         else:
             raise NotImplementedError
 
-        if sudo:
-            return ["sudo", *command]
-        return command
+        return [[*command, *packages]]
 
 
 def guess_package_manager() -> PackageManager:
@@ -84,12 +114,12 @@ def requirements_to_dict(reqs: Requirements) -> dict[str, list[str]]:
     return apischema.serialize(Requirements, reqs)
 
 
-def get_install_command(
+def get_install_commands(
     reqs: Requirements,
     source: PackageManager | str,
     sudo: bool = True,
     conda_path: Optional[str] = None,
-) -> Optional[list[str]]:
+) -> list[list[str]]:
     """
     Get the command to run to install package requirements using the package manager.
 
@@ -106,20 +136,18 @@ def get_install_command(
 
     Returns
     -------
-    list[str] or None
-        List of command-line arguments to run, or None if there are no
-        dependencies to install.
+    list[list[str]] or None
+        List of commands to run, split by command-line arguments.
     """
     if not isinstance(source, PackageManager):
         source = PackageManager[source]
 
     source_reqs = getattr(reqs, source.name)
     if not source_reqs:
-        return None
+        return []
 
-    command = source.get_command(
+    return source.get_commands(
         conda_path=conda_path,
         sudo=source.requires_sudo and sudo,
+        packages=source_reqs,
     )
-    command.extend(source_reqs)
-    return command
