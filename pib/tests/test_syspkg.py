@@ -57,8 +57,10 @@ def test_get_command(
     def which_conda(*_) -> str:  # noqa: ANN002
         return "my-conda-path"
 
+    packages = ["pkg"]
     monkeypatch.setattr(shutil, "which", which_conda)
-    assert syspkg.PackageManager[package_manager].get_command(sudo=sudo) == expected
+    commands = syspkg.PackageManager[package_manager].get_commands(packages=packages, sudo=sudo)
+    assert commands == [expected + packages]
 
 
 def test_get_full_command(monkeypatch: pytest.MonkeyPatch):
@@ -67,7 +69,7 @@ def test_get_full_command(monkeypatch: pytest.MonkeyPatch):
 
     reqs = Requirements(conda=["a", "b", "c"])
     monkeypatch.setattr(shutil, "which", which_conda)
-    assert syspkg.get_install_command(reqs, "conda") == ["my-conda-path", "install", "-y", "a", "b", "c"]
+    assert syspkg.get_install_commands(reqs, "conda") == [["my-conda-path", "install", "-y", "a", "b", "c"]]
 
 
 @pytest.mark.parametrize(
@@ -90,3 +92,11 @@ def test_guess_package_manager(
 
     monkeypatch.setattr(shutil, "which", which)
     assert syspkg.guess_package_manager() == syspkg.PackageManager[package_manager]
+
+
+def test_yum_groupinstall():
+    reqs = Requirements(yum=["group:'Development Tools'", "re2c"])
+    assert syspkg.get_install_commands(reqs, "yum", sudo=True) == [
+        ["sudo", "yum", "-y", "groupinstall", "Development Tools"],
+        ["sudo", "yum", "-y", "install", "re2c"],
+    ]

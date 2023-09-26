@@ -46,6 +46,9 @@ file = [ "requirements.txt",]
 [tool.setuptools.dynamic.optional-dependencies.test]
 file = "dev-requirements.txt"
 
+[tool.setuptools.dynamic.optional-dependencies.doc]
+file = "docs-requirements.txt"
+
 [tool.ruff]
 exclude = []
 fixable = [

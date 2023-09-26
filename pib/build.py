@@ -143,9 +143,14 @@ class Specifications:
         -------
         SpecificationFile
         """
+        logger.debug("Loading spec file: %s", spec_filename)
         spec_filename = pathlib.Path(spec_filename).expanduser().resolve()
         spec = SpecificationFile.from_filename(spec_filename)
-        self.add_spec(spec, filename=spec_filename)
+        try:
+            self.add_spec(spec, filename=spec_filename)
+        except Exception:
+            logger.exception("Failed to add spec file: %s", spec_filename)
+            raise
         return spec
 
     def add_spec(
@@ -330,7 +335,12 @@ def create_release_site(
     ----------
     specs : Specifications
     extra_variables: dict[str, str], optional
+        Extra variables to set in the RELEASE_SITE file.
     path: pathlib.Path, optional
+        The path to write the RELEASE_SITE file to.  Defaults to
+        settings-specified "{settings.support}/RELEASE_SITE".  For example,
+        this setting for EPICS BASE R7.0.3.1-2.0 would be:
+        ``/cds/group/pcds/epics/R7.0.3.1-2.0/modules``.
 
     Returns
     -------
@@ -345,6 +355,8 @@ def create_release_site(
     }
     if extra_variables:
         variables.update(extra_variables)
+
+    release_site.parent.mkdir(parents=True, exist_ok=True)
 
     with open(release_site, mode="w") as fp:
         for variable, value in variables.items():
@@ -487,6 +499,8 @@ def sync_module(specs: Specifications, module: Module) -> None:
     module : Module
         The module to synchronize.
     """
+    logger.debug("Synchronizing module: %s", module.name)
+
     group = get_dependency_group_for_module(module, specs.settings, recurse=True)
     dep = group.all_modules[group.root]
     logger.info("Updating makefiles in %s", group.root)
